@@ -68,6 +68,7 @@ void OnTick()
    DPrint("OnTick: Exec:"+executed);
    OpenOrder();
    doTrailingStop(ticket);
+   CloseOrder();
   }
 //+------------------------------------------------------------------+
 //| Timer function                                                   |
@@ -82,6 +83,7 @@ void OnTimer()
    }
    //Run checks for opening order
    OpenOrder();
+   CloseOrder();
    
 //---
    //Print("Test4 ping...");
@@ -113,6 +115,9 @@ void OpenOrder(){
 //--- calculated SL and TP prices must be normalized
    double stoploss=NormalizeDouble(price-minstoplevel*Point,Digits);
    stoploss=calculateNewStop(buySell, price, stopLossPips);
+   if (stopLossPips==0){
+      stoploss=0;
+   }
    double takeprofit=0;
    
    DPrint("Market: "+Bid+"/"+Ask);
@@ -134,7 +139,7 @@ void OpenOrder(){
       DPrint("Point: "+Point);
       DPrint("OrderType: "+OrderType());
       buySellHard=OrderType();
-      Comment("Ticket has been opened");
+      Comment("Ticket has been opened:" + ticket);
       }
 
 }
@@ -167,6 +172,7 @@ void CloseOrder(){
      }  else{
          Print("OrderClose placed successfully");
          orderClosed=true;
+         Comment("Trade has closed. EA must be removed and re-added to set up new conditions");
       }
    }
 }
@@ -188,11 +194,7 @@ double calculateNewStop(int longShortType, double origRate, int pipDist){
 void doTrailingStop(int ticket){
   
    DPrint("DoTrailig A Exec:"+ executed);
-   //Reset the market rate that influences trailing stop updates
-   //if (!trailingStopFlag){
-   //   trailingStopPegRate=0;
-   //}
-   //Exit if no trade was opened and trailingStopFlag is not set
+
    if(!executed){
       //Reset the market rate that influences trailing stop updates
       trailStopMktSource=0;
