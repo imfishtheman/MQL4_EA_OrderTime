@@ -33,6 +33,7 @@ bool orderClosed = false; //Last step, order has closed by EA, EA should no long
 
 int buySellHard; //Store hard permanent setting, in case client changes
 int ticket=0;
+int slippage=5;
 double trailStopMktSource=0; //Store last market rate that updated trailing stop rate
 int colorVal = clrGreen;
    
@@ -41,45 +42,7 @@ int colorVal = clrGreen;
 //+------------------------------------------------------------------+
 int OnInit()
   {
-  EventSetTimer(1);
-  /*
-  //MessageBox("Are you sure!!");
-  Print("OnInit called");
-  Print("Magic: "+magic);
-  Print("Executed: "+executed);
-  
-//--- create timer
-   EventSetTimer(4);
-   if(executed){
-   return (INIT_SUCCEEDED);
-   }
-//--- get minimum stop level
-   double minstoplevel=MarketInfo(Symbol(),MODE_STOPLEVEL);
-   Print("Minimum Stop Level=",minstoplevel," points");
-   double price=Bid;
-//--- calculated SL and TP prices must be normalized
-   double stoploss=NormalizeDouble(Bid-minstoplevel*Point,Digits);
-   double takeprofit=NormalizeDouble(Bid+minstoplevel*Point,Digits);
-   stoploss=0;
-   takeprofit=0;
-//--- place market order to buy 1 lot
-   int ticket=OrderSend(Symbol(),OP_SELL,.01,price,3,stoploss,takeprofit,"My order",16384,0,clrGreen);
-   if(ticket<0)
-     {
-      Print("OrderSend failed with error #",GetLastError());
-     }
-   else{
-      Print("OrderSend placed successfully");
-      executed=true;
-      OrderSelect(ticket, SELECT_BY_TICKET);
-      Print("Magic:" +OrderMagicNumber());
-      magic=OrderMagicNumber();
-      Print("OpenRate: "+OrderOpenPrice());
-      Print("Point: "+Point);
-      Print("OrderType: "+OrderType());
-
-      }
-*/
+  EventSetTimer(10);
    return(INIT_SUCCEEDED);
   }
   
@@ -102,7 +65,7 @@ void OnTick()
       Comment("Order has been closed. Remove EA and add again to reset");
       return; //EA's purpose completed previously
    }
-   
+   DPrint("OnTick: Exec:"+executed);
    OpenOrder();
    doTrailingStop(ticket);
   }
@@ -111,12 +74,15 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
   {
+     DPrint("OnTimer: Exec:"+executed);
+
    if(orderClosed) {
       Comment("Order has been closed. Remove EA and add again to reset");
       return; //EA's purpose completed previously
    }
    //Run checks for opening order
    OpenOrder();
+   
 //---
    //Print("Test4 ping...");
   }
@@ -149,11 +115,11 @@ void OpenOrder(){
    stoploss=calculateNewStop(buySell, price, stopLossPips);
    double takeprofit=0;
    
-   Print("Market: "+Bid+"/"+Ask);
-   Print("OpenRate: "+price);
-   Print("StopLoss: "+stoploss);
+   DPrint("Market: "+Bid+"/"+Ask);
+   DPrint("OpenRate: "+price);
+   DPrint("StopLoss: "+stoploss);
 
-   ticket=OrderSend(Symbol(),buySellHard,lots,price,3,stoploss,takeprofit,"MN:"+magicNumber,magicNumber,0,clrGreen);
+   ticket=OrderSend(Symbol(),buySellHard,lots,price,slippage,stoploss,takeprofit,"MN:"+magicNumber,magicNumber,0,clrGreen);
    if(ticket<0)
      {
       Print("OrderSend failed with error #",GetLastError());
@@ -176,7 +142,11 @@ void OpenOrder(){
 void CloseOrder(){
 
    //Exit if trade not yet opened and flag to close is not enabled
-   if(!executed && !closeTimeFlag){
+   if(!executed){
+      return ;
+   }
+
+   if(!closeTimeFlag){
       return ;
    }
    
@@ -191,7 +161,7 @@ void CloseOrder(){
    bool tktFound = OrderSelect(ticket,SELECT_BY_TICKET);
    if (tktFound){
       double closePrice = OrderType()==OP_BUY ? Bid : Ask; //if order was buy, get bid, else ask to close it
-      bool closeStatus = OrderClose(OrderTicket(), lots, closePrice,10, colorVal);
+      bool closeStatus = OrderClose(OrderTicket(), lots, closePrice,slippage, colorVal);
       if (!closeStatus){
          Print("OrderClose failed with error #",GetLastError());
      }  else{
@@ -216,20 +186,31 @@ double calculateNewStop(int longShortType, double origRate, int pipDist){
 }
 
 void doTrailingStop(int ticket){
-   
+  
+   DPrint("DoTrailig A Exec:"+ executed);
    //Reset the market rate that influences trailing stop updates
    //if (!trailingStopFlag){
    //   trailingStopPegRate=0;
    //}
    //Exit if no trade was opened and trailingStopFlag is not set
-   if(!executed && !trailingStopFlag){
+   if(!executed){
       //Reset the market rate that influences trailing stop updates
       trailStopMktSource=0;
-      DPrint("DoTrailig");
+      DPrint("DoTrailig Not Opened Yet");
    
       return;
    }
+   
+      if(!trailingStopFlag){
+      //Reset the market rate that influences trailing stop updates
+      trailStopMktSource=0;
+      DPrint("DoTrailig TrailStop Disabled");
+      return;
+   }
 
+
+   DPrint("DoTrailig:"+executed);
+   DPrint("DoTrailig:"+trailingStopFlag);
    OrderSelect(ticket, SELECT_BY_TICKET);
    int longShortType= OrderType();
    double currentSL = OrderStopLoss();
@@ -237,18 +218,22 @@ void doTrailingStop(int ticket){
    //First time trailFlag is set, we set initial trailTradeRate based on market
    if (trailStopMktSource==0){
       if (longShortType==OP_BUY){
-         trailStopMktSource=Ask;
-      } else{
          trailStopMktSource=Bid;
+      } else{
+         trailStopMktSource=Ask;
       }
       return;
    }
    
    //Check if new market rate is better then previous best market rate(last rate that caused stoploss to move via trailing update)
-   double newMarketRate = OrderType()==OP_BUY ? Ask : Bid;
+   double newMarketRate = OrderType()==OP_BUY ? Bid : Ask;
    double diff = getDifference(trailStopMktSource, newMarketRate, OrderType());
    
    if (diff <= 0 ){
+      DPrint("Negative market movemnt, do not update sl");
+      DPrint("OldMktRate: "+trailStopMktSource);
+      DPrint("NewMktRate: "+newMarketRate);
+
       //Market didn't get better that last best rate, ignore
       return;
    }
@@ -289,7 +274,7 @@ double getDifference(double oldRate, double newRate, int orderType){
    return diff;
 }
 
-bool debug=false;
+bool debug=true;
 void DPrint(string str){
    if(debug)
     Print(str);
