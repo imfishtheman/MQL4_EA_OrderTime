@@ -42,7 +42,7 @@ int colorVal = clrGreen;
 //+------------------------------------------------------------------+
 int OnInit()
   {
-  EventSetTimer(10);
+  EventSetTimer(1);
    return(INIT_SUCCEEDED);
   }
   
@@ -61,11 +61,20 @@ void OnDeinit(const int reason)
 void OnTick()
   {
 //---
+
+   if (ticket!=0){
+      bool found = OrderSelect(ticket, SELECT_BY_TICKET);
+      if (!found || OrderCloseTime()!=0){
+      orderClosed=true;
+      }
+    }
+    
+    
    if(orderClosed) {
       Comment("Order has been closed. Remove EA and add again to reset");
+      EventKillTimer();
       return; //EA's purpose completed previously
    }
-   DPrint("OnTick: Exec:"+executed);
    OpenOrder();
    doTrailingStop(ticket);
    CloseOrder();
@@ -75,10 +84,16 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
   {
-     DPrint("OnTimer: Exec:"+executed);
-
+   if (ticket!=0){
+      bool found = OrderSelect(ticket, SELECT_BY_TICKET);
+            Print("Found:"+found);
+      if (!found || OrderCloseTime()!=0){
+      orderClosed=true;
+      }
+    }
+      
    if(orderClosed) {
-      Comment("Order has been closed. Remove EA and add again to reset");
+      Comment("Order has been closed. Remove EA and add again to start again");
       return; //EA's purpose completed previously
    }
    //Run checks for opening order
@@ -104,7 +119,7 @@ void OpenOrder(){
    if (!timeToOpen){
       DPrint("Market: "+Bid+"/"+Ask);
 
-      DPrint("Too Early");
+      DPrint("Too Early to Open");
       return;
    }
    
@@ -123,8 +138,8 @@ void OpenOrder(){
    DPrint("Market: "+Bid+"/"+Ask);
    DPrint("OpenRate: "+price);
    DPrint("StopLoss: "+stoploss);
-
-   ticket=OrderSend(Symbol(),buySellHard,lots,price,slippage,stoploss,takeprofit,"MN:"+magicNumber,magicNumber,0,clrGreen);
+   
+   ticket=OrderSend(Symbol(),buySell,lots,price,slippage,stoploss,takeprofit,"MN:"+magicNumber,magicNumber,0,clrGreen);
    if(ticket<0)
      {
       Print("OrderSend failed with error #",GetLastError());
@@ -202,6 +217,16 @@ void doTrailingStop(int ticket){
    
       return;
    }
+   
+   bool found = OrderSelect(ticket, SELECT_BY_TICKET);
+   if (found){
+     //Don't do trailing stop if no stoploss value is set
+      if (OrderStopLoss()==0){
+        Print("Invalid trailing stop param, No stoploss detected");
+        return; 
+        }  
+   }
+   
    
       if(!trailingStopFlag){
       //Reset the market rate that influences trailing stop updates
