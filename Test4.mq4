@@ -127,9 +127,11 @@ void OpenOrder(){
    double minstoplevel=MarketInfo(Symbol(),MODE_STOPLEVEL);
    Print("Minimum Stop Level=",minstoplevel," points");
    double price= buySell==OP_BUY ? Ask : Bid;
+   //For the stop, we will grab the market rate of the other side
+   double priceCounter = buySell==OP_BUY ? Bid : Ask;
 //--- calculated SL and TP prices must be normalized
-   double stoploss=NormalizeDouble(price-minstoplevel*Point,Digits);
-   stoploss=calculateNewStop(buySell, price, stopLossPips);
+   double stoploss=0;
+   stoploss=calculateNewStop(buySell, priceCounter, stopLossPips);
    if (stopLossPips==0){
       stoploss=0;
    }
@@ -181,7 +183,7 @@ void CloseOrder(){
    bool tktFound = OrderSelect(ticket,SELECT_BY_TICKET);
    if (tktFound){
       double closePrice = OrderType()==OP_BUY ? Bid : Ask; //if order was buy, get bid, else ask to close it
-      bool closeStatus = OrderClose(OrderTicket(), lots, closePrice,slippage, colorVal);
+      bool closeStatus = OrderClose(OrderTicket(), OrderLots(), closePrice,slippage, colorVal);
       if (!closeStatus){
          Print("OrderClose failed with error #",GetLastError());
      }  else{
