@@ -56,7 +56,7 @@ input HMAPriceType HMAPrice=CloseRate;
 
 input int PivotsGMTShift = 0;
 input int PivotRange = 10;
-input int PivotLevel = Pivot;
+input PivotLabels PivotLevel = Pivot;
 
 string pivotsFilePath="Mike\\gStdPivots";
 string hmaFilePath="Mike\\HMA_Russian_Color";
@@ -70,7 +70,7 @@ int OnInit()
   
       
 //--- create timer
-   EventSetTimer(60);
+   //EventSetTimer(60);
    
 //---
    return(INIT_SUCCEEDED);
