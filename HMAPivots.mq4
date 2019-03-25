@@ -45,6 +45,11 @@ enum PivotLabels{
    R3=6
 };
 
+enum HMAColors{
+   HMABlue=0,
+   HMARed=1
+};
+
 input int HMAPeriods = 21; //HMAPeriods
 input CalculationMethod HMAMethod = Simple; 
 input HMAPriceType HMAPrice=CloseRate;
@@ -52,6 +57,10 @@ input HMAPriceType HMAPrice=CloseRate;
 input int PivotsGMTShift = 0;
 input int PivotRange = 10;
 input int PivotLevel = Pivot;
+
+string pivotsFilePath="Mike\\gStdPivots";
+string hmaFilePath="Mike\\HMA_Russian_Color";
+
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -81,17 +90,35 @@ void OnDeinit(const int reason)
 void OnTick()
   {
 //---
-     
-      double s3Rate = iCustom(NULL, 0, "Mike\\gStdPivots", PivotsGMTShift, clrGreen,clrRed, 10,20,S3,0);
+/*     
+      double s3Rate = iCustom(NULL, 0, pivotsFilePath, PivotsGMTShift, clrGreen,clrRed, 10,20,S3,0);
       Print("OnTick S3Rate: "+s3Rate);      
 
-      double pivotRate = iCustom(NULL, 0, "Mike\\gStdPivots", PivotsGMTShift, clrGreen,clrRed, 10,20,Pivot,0);
+      double s2Rate = iCustom(NULL, 0, pivotsFilePath, PivotsGMTShift, clrGreen,clrRed, 10,20,S2,0);
+      Print("OnTick S12Rate: "+s2Rate);
+      
+      double s1Rate = iCustom(NULL, 0, pivotsFilePath, PivotsGMTShift, clrGreen,clrRed, 10,20,S1,0);
+      Print("OnTick S1Rate: "+s1Rate);
+      
+      double pivotRate = iCustom(NULL, 0, pivotsFilePath, PivotsGMTShift, clrGreen,clrRed, 10,20,Pivot,0);
       Print("OnTick pivotRate: "+pivotRate);
 
-      double r3Rate = iCustom(NULL, 0, "Mike\\gStdPivots", PivotsGMTShift, clrGreen,clrRed, 10,20,R3,0);
+      double r1Rate = iCustom(NULL, 0, pivotsFilePath, PivotsGMTShift, clrGreen,clrRed, 10,20,R1,0);
+      Print("OnTick R3Rate: "+r1Rate);
+
+      double r2Rate = iCustom(NULL, 0, pivotsFilePath, PivotsGMTShift, clrGreen,clrRed, 10,20,R2,0);
+      Print("OnTick R3Rate: "+r2Rate);
+
+      double r3Rate = iCustom(NULL, 0, pivotsFilePath, PivotsGMTShift, clrGreen,clrRed, 10,20,R3,0);
       Print("OnTick R3Rate: "+r3Rate);
+*/
+      double hmaBlue = iCustom(NULL, 0, hmaFilePath, HMAPeriods, HMAMethod, HMAPrice, HMABlue,0);
+      Print("OnTick HMABlue: "+hmaBlue);
+      
+      double hmaRed = iCustom(NULL, 0, hmaFilePath, HMAPeriods, HMAMethod, HMAPrice, HMARed,0);
+      Print("OnTick HMARed: "+hmaRed);
 
-
+      Print("Int Max: ",INT_MAX);
   }
 //+------------------------------------------------------------------+
 //| Timer function                                                   |
