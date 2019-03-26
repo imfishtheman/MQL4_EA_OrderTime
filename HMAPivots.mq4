@@ -140,7 +140,7 @@ void OnTimer()
 //+------------------------------------------------------------------+
 HMAColors GetCurrentHMAColor(double hmaBlueCurrent, double hmaRedCurrent){
    if (hmaBlueCurrent!=INT_MAX && hmaRedCurrent!=INT_MAX){
-      return HMABoth;
+      return HMABoth;  //Does nothing.  We are at time where HMA changes direction/color
    }
    
    if (hmaBlueCurrent!=INT_MAX && hmaRedCurrent==INT_MAX){
@@ -192,7 +192,9 @@ void PlaceEntryOrderBuy(){//double entryRate, BuySell buySell, double stoploss){
 
 }
 
-
+//+------------------------------------------------------------------+
+//| Validation check for HMABlue condition
+//+------------------------------------------------------------------+
 bool LastClosedCandleOpenGreaterThenClosePrice(){
    double lstClsdCndlOpen = Open[1];
    double clsPrice = Close[0];
@@ -205,6 +207,9 @@ bool LastClosedCandleOpenGreaterThenClosePrice(){
    }
 }
 
+//+------------------------------------------------------------------+
+//| Validation check for HMABlue condition
+//+------------------------------------------------------------------+
 bool PrevLastClosedCandleOpenGreaterThenClosePrice(){
    double prvToLstCandlOpen = Open[2];
    double clsPrice = Close[0];
@@ -217,6 +222,7 @@ bool PrevLastClosedCandleOpenGreaterThenClosePrice(){
       return false;
    }
 }
+
 void HandleHMABlue(double pivotRate){
    Print("Doing Blue logic");
    double currClose = Close[0];
@@ -225,43 +231,124 @@ void HandleHMABlue(double pivotRate){
    if (ValidateClosePriceVsPivotLvlRange(PivotLevel, pivotRate, PivotRange)){
       if (LastClosedCandleOpenGreaterThenClosePrice()){
           if(PrevLastClosedCandleOpenGreaterThenClosePrice() ){
-          //Place entry
-            double lstClsdCndlHigh = High[1]; //Used as open rate on entry order
-            double lstClsdCndlLow = Low[1];   //Used as stop loss on entry order
             PlaceEntryOrderBuy();
          }
        } 
    } 
 }
 
+//--------------
+//+------------------------------------------------------------------+
+//| Entry Order placement to open ticket with a Sell via HMA - Ren line                                                  |
+//+------------------------------------------------------------------+
+void PlaceEntryOrderSell(){//double entryRate, BuySell buySell, double stoploss){
+         //Place entry
+   double lstClsdCndlLow = Low[1];   //Used as open rate on entry order  
+   double lstClsdCndlHigh = High[1]; //Used as stop loss on entry order
+
+  if(tktOpened){
+   //Print("Already Opened Order");
+   return;
+  }
+  
+  
+  double normalizedEntryRate = NormalizeDouble(lstClsdCndlLow,Digits);
+  double normalizedStopLoss = NormalizeDouble(lstClsdCndlHigh,Digits);
+  double normalizedTakeProfit = NormalizeDouble(normalizedEntryRate-(TakeProfit* usePoint),Digits);
+  int OpType = normalizedEntryRate > Bid ? OP_BUYSTOP : OP_BUYLIMIT;
+ 
+  double slippage=10;
+  double takeprofit=0;
+  int ticket=0;
+   ticket=OrderSend(Symbol(),OpType,LotSize,normalizedEntryRate,slippage,normalizedStopLoss,normalizedTakeProfit,"MN:"+MagicNumber,MagicNumber,0,clrGreen);
+   if(ticket<0)
+     {
+      Print("OrderSend failed with error #",GetLastError());
+     }
+   else {
+      Print("OrderSend placed successfully");
+      tktOpened=true;
+      }
+
+}
 
 //+------------------------------------------------------------------+
-//| Initial validation check of algorithm.  Used for both options                                                  |
+//| Validation check for HMARed condition
+//+------------------------------------------------------------------+
+bool LastClosedCandleOpenLessThenClosePrice(){
+   double lstClsdCndlOpen = Open[1];
+   double clsPrice = Close[0];
+   if(lstClsdCndlOpen < clsPrice){
+      return true;
+   } else {
+      Print("Failed last Closed Cndle Open < clsPrice");
+      Print(lstClsdCndlOpen+" < "+clsPrice);
+      return false;
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Validation check for HMARed condition
+//+------------------------------------------------------------------+
+bool PrevLastClosedCandleOpenLessThenClosePrice(){
+   double prvToLstCandlOpen = Open[2];
+   double clsPrice = Close[0];
+      
+   if(prvToLstCandlOpen < clsPrice){
+      return true;
+   } else {
+      Print("Failed Prev to Last Candle Open < clsPrice");
+      Print(prvToLstCandlOpen+" < "+clsPrice);
+      return false;
+   }
+}
+
+
+void HandleHMARed(double pivotRate){
+   DPrint("Doing Red logic");
+
+   if (ValidateClosePriceVsPivotLvlRange(PivotLevel, pivotRate, PivotRange)){
+      if (LastClosedCandleOpenLessThenClosePrice()){
+          if(PrevLastClosedCandleOpenLessThenClosePrice() ){
+            PlaceEntryOrderSell();
+         }
+       } 
+   } 
+
+}
+
+
+
+//+------------------------------------------------------------------+
+//| Initial validation check of algorithm.  Used for both HMA conditions                                                  |
 //+------------------------------------------------------------------+
 bool ValidateClosePriceVsPivotLvlRange(int pivotLvl, double pivotVal, double pipRange){
    bool ret = false;
-   double closePriceLastCandl = Close[1];
+   double closePriceLastCandl = Close[0]; //Assuming last candle = current candle?
    double openThresholdPlus = pivotVal+(pipRange*usePoint);
    double openThresholdNeg = pivotVal-(pipRange*usePoint);
 
-   DPrint("PipMagic:"+pipRange*usePoint);
-   DPrint("closePriceLastCandl:" +closePriceLastCandl);
+   DPrint(__FUNCTION__"PipMagic:"+pipRange*usePoint);
+   DPrint(__FUNCTION__"closePriceLastCandl:" +closePriceLastCandl);
    DPrint(__FUNCTION__"--:--"+pivotVal+"--:--"+pipRange);
-   DPrint(__FUNCTION__+":: "+openThresholdPlus+"--:--"+openThresholdNeg);
+   DPrint(__FUNCTION__":: "+openThresholdPlus+"--:--"+openThresholdNeg);
    
    if (closePriceLastCandl > openThresholdPlus){
-      Print("CloseLastCandl Greater then pivot range");
+      DPrint(__FUNCTION__"CloseLastCandl Greater then pivot range");
       ret = true;
    } else if (closePriceLastCandl < openThresholdNeg){
-         Print("CloseLastCandl Less then pivot range");
+      DPrint(__FUNCTION__"CloseLastCandl Less then pivot range");
       ret = true;
    }
 
    if(!ret){
-      Print("Failed Validate Close Price Vs Pivot Lvl Range");
-      Print(closePriceLastCandl + " vs " + pivotVal + ". PipRange="+pipRange);
+      DPrint(__FUNCTION__" Failed Validate Close Price Vs Pivot Lvl Range");
+      DPrint(__FUNCTION__" "+closePriceLastCandl + " vs " + pivotVal + ". PipRange="+pipRange);
+      DPrint(__FUNCTION__" "+closePriceLastCandl + " > " + openThresholdPlus + ". PipRange="+pipRange);
+      DPrint(__FUNCTION__" "+closePriceLastCandl + " < " + openThresholdNeg + ". PipRange="+pipRange);
+      
    }
-   Print(__FUNCTION__+"- Returning: "+ret);
+   DPrint(__FUNCTION__+"- Returning: "+ret);
    return ret;
 }
 
@@ -269,24 +356,9 @@ bool ValidateClosePriceVsPivotLvlRange(int pivotLvl, double pivotVal, double pip
 
 
 
-void HandleHMARed(double pivotRate){
-   Print("Doing Blue logic");
-   double currClose = Close[0];
-   double prevClose = Close[1];
-/*
-   Print("CurrClose: "+currClose);
-      Print("PrevClose: "+prevClose);
-      Print("------");
-      
-   if (ValidateClosePriceVsPivotLvlRange(PivotLevel, pivotRate, PivotRange)){
-   
-   }
-*/
-
-}
 
 
-bool debug=false;
+bool debug=true;
 void DPrint(string str){
    if(debug)
     Print(str);
