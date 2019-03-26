@@ -45,12 +45,14 @@ input PivotLabels PivotLevel = Pivot;
 input int MagicNumber = 12345;
 
 input double LotSize =0.01;
+input int TakeProfit = 20;
+input int PipProfit = 40;
 
 string pivotsFilePath="Mike\\gStdPivots";
 string hmaFilePath="Mike\\HMA_Russian_Color";
 double usePoint;
 
-bool tickOpened = false;
+bool tktOpened = false;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -113,7 +115,6 @@ void OnTick()
       double hmaRed = iCustom(NULL, 0, hmaFilePath, HMAPeriods, HMAMethod, HMAPrice, HMARed,0);
       DPrint("OnTick HMARed: "+hmaRed);
 
-      DPrint("Int Max: "+INT_MAX);
       
       HMAColors hma = GetCurrentHMAColor(hmaBlue,hmaRed);
       
@@ -157,7 +158,118 @@ HMAColors GetCurrentHMAColor(double hmaBlueCurrent, double hmaRedCurrent){
 }
 
 
+//+------------------------------------------------------------------+
+//| Entry Order placement to open ticket with a buy via HMA - Blue line                                                  |
+//+------------------------------------------------------------------+
+void PlaceEntryOrderBuy(){//double entryRate, BuySell buySell, double stoploss){
+         //Place entry
+   double lstClsdCndlHigh = High[1]; //Used as open rate on entry order
+   double lstClsdCndlLow = Low[1];   //Used as stop loss on entry order  
+
+  if(tktOpened){
+   //Print("Already Opened Order");
+   return;
+  }
+  
+  
+  double normalizedEntryRate = NormalizeDouble(lstClsdCndlHigh,Digits);
+  double normalizedStopLoss = NormalizeDouble(lstClsdCndlLow,Digits);
+  double normalizedTakeProfit = NormalizeDouble(normalizedEntryRate+(TakeProfit* usePoint),Digits);
+  int OpType = normalizedEntryRate > Ask ? OP_BUYSTOP : OP_BUYLIMIT;
+ 
+  double slippage=10;
+  double takeprofit=0;
+  int ticket=0;
+   ticket=OrderSend(Symbol(),OpType,LotSize,normalizedEntryRate,slippage,normalizedStopLoss,normalizedTakeProfit,"MN:"+MagicNumber,MagicNumber,0,clrGreen);
+   if(ticket<0)
+     {
+      Print("OrderSend failed with error #",GetLastError());
+     }
+   else {
+      Print("OrderSend placed successfully");
+      tktOpened=true;
+      }
+
+}
+
+
+bool LastClosedCandleOpenGreaterThenClosePrice(){
+   double lstClsdCndlOpen = Open[1];
+   double clsPrice = Close[0];
+   if(lstClsdCndlOpen > clsPrice){
+      return true;
+   } else {
+      Print("Failed last Closed Cndle Open > clsPrice");
+      Print(lstClsdCndlOpen+" > "+clsPrice);
+      return false;
+   }
+}
+
+bool PrevLastClosedCandleOpenGreaterThenClosePrice(){
+   double prvToLstCandlOpen = Open[2];
+   double clsPrice = Close[0];
+      
+   if(prvToLstCandlOpen > clsPrice){
+      return true;
+   } else {
+      Print("Failed Prev to Last Candle Open > clsPrice");
+      Print(prvToLstCandlOpen+" > "+clsPrice);
+      return false;
+   }
+}
 void HandleHMABlue(double pivotRate){
+   Print("Doing Blue logic");
+   double currClose = Close[0];
+   double prevClose = Close[1];
+      
+   if (ValidateClosePriceVsPivotLvlRange(PivotLevel, pivotRate, PivotRange)){
+      if (LastClosedCandleOpenGreaterThenClosePrice()){
+          if(PrevLastClosedCandleOpenGreaterThenClosePrice() ){
+          //Place entry
+            double lstClsdCndlHigh = High[1]; //Used as open rate on entry order
+            double lstClsdCndlLow = Low[1];   //Used as stop loss on entry order
+            PlaceEntryOrderBuy();
+         }
+       } 
+   } 
+}
+
+
+//+------------------------------------------------------------------+
+//| Initial validation check of algorithm.  Used for both options                                                  |
+//+------------------------------------------------------------------+
+bool ValidateClosePriceVsPivotLvlRange(int pivotLvl, double pivotVal, double pipRange){
+   bool ret = false;
+   double closePriceLastCandl = Close[1];
+   double openThresholdPlus = pivotVal+(pipRange*usePoint);
+   double openThresholdNeg = pivotVal-(pipRange*usePoint);
+
+   DPrint("PipMagic:"+pipRange*usePoint);
+   DPrint("closePriceLastCandl:" +closePriceLastCandl);
+   DPrint(__FUNCTION__"--:--"+pivotVal+"--:--"+pipRange);
+   DPrint(__FUNCTION__+":: "+openThresholdPlus+"--:--"+openThresholdNeg);
+   
+   if (closePriceLastCandl > openThresholdPlus){
+      Print("CloseLastCandl Greater then pivot range");
+      ret = true;
+   } else if (closePriceLastCandl < openThresholdNeg){
+         Print("CloseLastCandl Less then pivot range");
+      ret = true;
+   }
+
+   if(!ret){
+      Print("Failed Validate Close Price Vs Pivot Lvl Range");
+      Print(closePriceLastCandl + " vs " + pivotVal + ". PipRange="+pipRange);
+   }
+   Print(__FUNCTION__+"- Returning: "+ret);
+   return ret;
+}
+
+
+
+
+
+void HandleHMARed(double pivotRate){
    Print("Doing Blue logic");
    double currClose = Close[0];
    double prevClose = Close[1];
@@ -173,82 +285,6 @@ void HandleHMABlue(double pivotRate){
 
 }
 
-void PlaceEntryOrder(double entryRate, BuySell buySell, double stoploss){
-  
-  if(tickOpened){
-   Print("Already Opened Order");
-   return;
-  }
-  int OpType = entryRate > Ask ? OP_BUYSTOP : OP_BUYLIMIT;
-  double normalizedEntryRate = NormalizeDouble(entryRate,Digits);
-  double slippage=10;
-  double takeprofit=0;
-  double magicNumber=12345;
-  int ticket=0;
-   ticket=OrderSend(Symbol(),OpType,LotSize,normalizedEntryRate,slippage,stoploss,takeprofit,"MN:"+magicNumber,magicNumber,0,clrGreen);
-   if(ticket<0)
-     {
-      Print("OrderSend failed with error #",GetLastError());
-     }
-   else {
-      Print("OrderSend placed successfully");
-      tickOpened=true;
-      }
-
-}
-void HandleHMARed(double pivotRate){
-   Print("Doing Red logic");
-   double currClose = Close[0];
-   double prevClose = Close[1];
-
-   Print("CurrClose: "+currClose);
-      Print("PrevClose: "+prevClose);
-      Print("------");
-      
-   if (ValidateClosePriceVsPivotLvlRange(PivotLevel, pivotRate, PivotRange)){
-      double lstClsdCndlOpen = Open[1];
-      double clsPrice = Close[0];
-      double prvToLstCandlOpen = Open[2];
-      if (true || lstClsdCndlOpen > clsPrice){
-          if(true || prvToLstCandlOpen > clsPrice ){
-          //Place entry
-            double lstClsdCndlHigh = High[1]; //Used as open rate on entry order
-            double lstClsdCndlLow = Low[1];   //Used as top loss on entry order
-            PlaceEntryOrder(lstClsdCndlHigh, OP_BUY, lstClsdCndlLow);
-         } else{
-            Print("Failed Prev to Last Candle Open > clsPrice");
-         }
-      } else {
-         Print("Failed last Closed Cndle Open > clsPrice");
-         Print(lstClsdCndlOpen+" > "+clsPrice);
-      }
-   } else {
-      Print("Failed Validate Close Price Vs Pivot Lvl Range");
-   }
-}
-
-bool ValidateClosePriceVsPivotLvlRange(int pivotLvl, double pivotVal, double pipRange){
-   bool ret = false;
-   double closePriceLastCandl = Close[1];
-   double openThresholdPlus = pivotVal+(pipRange*usePoint);
-   double openThresholdNeg = pivotVal-(pipRange*usePoint);
-
-   Print("PipMagic:"+pipRange*usePoint);
-   Print("closePriceLastCandl:" +closePriceLastCandl);
-   Print(__FUNCTION__"--:--"+pivotVal+"--:--"+pipRange);
-   Print(__FUNCTION__+":: "+openThresholdPlus+"--:--"+openThresholdNeg);
-   
-   if (closePriceLastCandl > openThresholdPlus){
-      Print("CloseLastCandl Greater then pivot range");
-      ret = true;
-   } else if (closePriceLastCandl < openThresholdNeg){
-         Print("CloseLastCandl Less then pivot range");
-      ret = true;
-   }
-
-   Print(__FUNCTION__+"- Returning: "+ret);
-   return ret;
-}
 
 bool debug=false;
 void DPrint(string str){
