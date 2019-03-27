@@ -51,6 +51,7 @@ input int PipProfit = 40;
 string pivotsFilePath="Mike\\gStdPivots";
 string hmaFilePath="Mike\\HMA_Russian_Color";
 double usePoint;
+int ticket=0;
 
 bool tktOpened = false;
 
@@ -174,12 +175,11 @@ void PlaceEntryOrderBuy(){//double entryRate, BuySell buySell, double stoploss){
   
   double normalizedEntryRate = NormalizeDouble(lstClsdCndlHigh,Digits);
   double normalizedStopLoss = NormalizeDouble(lstClsdCndlLow,Digits);
-  double normalizedTakeProfit = NormalizeDouble(normalizedEntryRate+(TakeProfit* usePoint),Digits);
+  double normalizedTakeProfit = CalculateLongOrderTakeProfit(normalizedEntryRate);
   int OpType = normalizedEntryRate > Ask ? OP_BUYSTOP : OP_BUYLIMIT;
  
   double slippage=10;
-  double takeprofit=0;
-  int ticket=0;
+  ticket=0;
    ticket=OrderSend(Symbol(),OpType,LotSize,normalizedEntryRate,slippage,normalizedStopLoss,normalizedTakeProfit,"MN:"+MagicNumber,MagicNumber,0,clrGreen);
    if(ticket<0)
      {
@@ -191,6 +191,13 @@ void PlaceEntryOrderBuy(){//double entryRate, BuySell buySell, double stoploss){
       }
 
 }
+
+double CalculateLongOrderTakeProfit(double orderRate){
+   double takeProfit = NormalizeDouble(orderRate+(TakeProfit*usePoint),Digits);
+   return takeProfit;
+}
+
+
 
 //+------------------------------------------------------------------+
 //| Validation check for HMABlue condition
@@ -237,6 +244,13 @@ void HandleHMABlue(double pivotRate){
    } 
 }
 
+
+double CalculateShortOrderTakeProfit(double orderRate){
+   double takeProfit = NormalizeDouble(orderRate-(TakeProfit*usePoint),Digits);
+   return takeProfit;
+}
+
+
 //--------------
 //+------------------------------------------------------------------+
 //| Entry Order placement to open ticket with a Sell via HMA - Ren line                                                  |
@@ -254,12 +268,11 @@ void PlaceEntryOrderSell(){//double entryRate, BuySell buySell, double stoploss)
   
   double normalizedEntryRate = NormalizeDouble(lstClsdCndlLow,Digits);
   double normalizedStopLoss = NormalizeDouble(lstClsdCndlHigh,Digits);
-  double normalizedTakeProfit = NormalizeDouble(normalizedEntryRate-(TakeProfit* usePoint),Digits);
+  double normalizedTakeProfit = CalculateShortOrderTakeProfit(normalizedEntryRate);
   int OpType = normalizedEntryRate > Bid ? OP_BUYSTOP : OP_BUYLIMIT;
  
   double slippage=10;
-  double takeprofit=0;
-  int ticket=0;
+  ticket=0;
    ticket=OrderSend(Symbol(),OpType,LotSize,normalizedEntryRate,slippage,normalizedStopLoss,normalizedTakeProfit,"MN:"+MagicNumber,MagicNumber,0,clrGreen);
    if(ticket<0)
      {
