@@ -58,13 +58,19 @@ double trailStopDependentRate=0;
 double usePoint;
 int ticket=0;
 
-bool tktOpened = false;
+
+bool entryOrdPlaced = false;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
+   if(!MagicNumberValidator()){
+   return (INIT_PARAMETERS_INCORRECT);
+   }
+   
+
    if(Digits()==2 || Digits()==3) usePoint=0.01;
    if(Digits()==4 || Digits()==5) usePoint=0.0001;
 
@@ -90,9 +96,11 @@ void OnDeinit(const int reason)
 void OnTick()
   {
 //---
-
+      HandlePositionClosed();
       doTrailingStop(ticket);
-      if(tktOpened){
+      
+      
+      if(entryOrdPlaced){
          Comment("Position opened. EA Still in testing mode");
          return;
       }
@@ -155,12 +163,10 @@ HMAColors GetCurrentHMAColor(double hmaBlueCurrent, double hmaRedCurrent){
    }
    
    if (hmaBlueCurrent!=INT_MAX && hmaRedCurrent==INT_MAX){
-      Print("Ret Blue");
       return HMABlue;
    }
    
    if (hmaRedCurrent!=INT_MAX && hmaBlueCurrent==INT_MAX){
-      Print("Ret Red");
       return HMARed;
    }
    
@@ -177,8 +183,7 @@ void PlaceEntryOrderBuy(){//double entryRate, BuySell buySell, double stoploss){
    double lstClsdCndlHigh = High[1]; //Used as open rate on entry order
    double lstClsdCndlLow = Low[1];   //Used as stop loss on entry order  
 
-  if(tktOpened){
-   //Print("Already Opened Order");
+  if(entryOrdPlaced){
    return;
   }
   
@@ -191,16 +196,17 @@ void PlaceEntryOrderBuy(){//double entryRate, BuySell buySell, double stoploss){
   double slippage=10;
   ticket=0;
    ticket=OrderSend(Symbol(),OpType,LotSize,normalizedEntryRate,slippage,normalizedStopLoss,normalizedTakeProfit,"MN:"+MagicNumber,MagicNumber,0,clrGreen);
-   if(ticket<0)
+   if(ticket<=0)
      {
       Print("OrderSend failed with error #",GetLastError());
      }
    else {
       Print("OrderSend placed successfully");
-      tktOpened=true;
+      entryOrdPlaced=true;
       
       //Set initial Trailing Stop Dependency
-      trailStopDependentRate = normalizedEntryRate-(TakeProfit*usePoint);
+//      trailStopDependentRate = normalizedEntryRate-(PipProfit*usePoint);
+//      Print("Initial TrailStopDependentRate: "+trailStopDependentRate);
       }
 
 }
@@ -225,8 +231,8 @@ bool LastClosedCandleOpenGreaterThenClosePrice(){
    if(lstClsdCndlOpen > clsPrice){
       return true;
    } else {
-      Print("Failed last Closed Cndle Open > clsPrice");
-      Print(lstClsdCndlOpen+" > "+clsPrice);
+      DPrint("Failed last Closed Cndle Open > clsPrice");
+      DPrint(lstClsdCndlOpen+" > "+clsPrice);
       return false;
    }
 }
@@ -245,14 +251,14 @@ bool PrevLastClosedCandleOpenGreaterThenClosePrice(){
    if(prvToLstCandlOpen > clsPrice){
       return true;
    } else {
-      Print("Failed Prev to Last Candle Open > clsPrice");
-      Print(prvToLstCandlOpen+" > "+clsPrice);
+      DPrint("Failed Prev to Last Candle Open > clsPrice");
+      DPrint(prvToLstCandlOpen+" > "+clsPrice);
       return false;
    }
 }
 
 void HandleHMABlue(double pivotRate){
-   Print("Doing Blue logic");
+   //Print("Doing Blue logic");
    double currClose = Close[0];
    double prevClose = Close[1];
       
@@ -282,7 +288,7 @@ void PlaceEntryOrderSell(){//double entryRate, BuySell buySell, double stoploss)
    double lstClsdCndlHigh = High[1]; //Used as stop loss on entry order
 
 
-  if(tktOpened){
+  if(entryOrdPlaced){
    //Print("Already Opened Order");
    return;
   }
@@ -296,17 +302,18 @@ void PlaceEntryOrderSell(){//double entryRate, BuySell buySell, double stoploss)
   DPrint("PlacingOrder OPType:"+OpType+", Rt:"+normalizedEntryRate+", SL:"+normalizedStopLoss);
   double slippage=10;
   ticket=0;
+  //Placing our Pending Order
    ticket=OrderSend(Symbol(),OpType,LotSize,normalizedEntryRate,slippage,normalizedStopLoss,normalizedTakeProfit,"MN:"+MagicNumber,MagicNumber,0,clrGreen);
-   if(ticket<0)
+   if(ticket<=0)
      {
       Print("OrderSend failed with error #",GetLastError());
      }
    else {
       Print("OrderSend placed successfully");
-      tktOpened=true;
+      entryOrdPlaced=true;
       //Set initial Trailing Stop Dependency
-      trailStopDependentRate = normalizedEntryRate+(TakeProfit*usePoint);
-
+//      trailStopDependentRate = normalizedEntryRate+(TakeProfit*usePoint);
+//      Print("Initial TrailStopDependentRate: "+trailStopDependentRate);
       }
 
 }
@@ -315,13 +322,17 @@ void PlaceEntryOrderSell(){//double entryRate, BuySell buySell, double stoploss)
 //| Validation check for HMARed condition
 //+------------------------------------------------------------------+
 bool LastClosedCandleOpenLessThenClosePrice(){
+   if(debug){
+      return true;
+   }
+
    double lstClsdCndlOpen = Open[1];
    double clsPrice = Close[1];
    if(lstClsdCndlOpen < clsPrice){
       return true;
    } else {
-      Print("Failed last Closed Cndle Open < clsPrice");
-      Print(lstClsdCndlOpen+" < "+clsPrice);
+      DPrint("Failed last Closed Cndle Open < clsPrice");
+      DPrint(lstClsdCndlOpen+" < "+clsPrice);
       return false;
    }
 }
@@ -330,21 +341,25 @@ bool LastClosedCandleOpenLessThenClosePrice(){
 //| Validation check for HMARed condition
 //+------------------------------------------------------------------+
 bool PrevLastClosedCandleOpenLessThenClosePrice(){
+   if(debug){
+      return true;
+   }
+   
    double prvToLstCandlOpen = Open[2];
    double clsPrice = Close[2];
       
    if(prvToLstCandlOpen < clsPrice){
       return true;
    } else {
-      Print("Failed Prev to Last Candle Open < clsPrice");
-      Print(prvToLstCandlOpen+" < "+clsPrice);
+      DPrint("Failed Prev to Last Candle Open < clsPrice");
+      DPrint(prvToLstCandlOpen+" < "+clsPrice);
       return false;
    }
 }
 
 
 void HandleHMARed(double pivotRate){
-   DPrint("Doing Red logic");
+   //DPrint("Doing Red logic");
 
    if (ValidateClosePriceVsPivotLvlRange(PivotLevel, pivotRate, PivotRange)){
       if (LastClosedCandleOpenLessThenClosePrice()){
@@ -390,27 +405,51 @@ bool ValidateClosePriceVsPivotLvlRange(int pivotLvl, double pivotVal, double pip
 }
 
 
-void doTrailingStop(int ticket){
-  
-   if(ticket==0){
-      //No position opened yet   
+void doTrailingStop(int ticket){ 
+   
+   bool found = OrderSelect(ticket, SELECT_BY_TICKET);
+/*
+   if (found){
+   //Print(__FUNCTION__" Order was found");
+     //Don't do trailing stop if no stoploss value is set
+      if (OrderStopLoss()==0){
+       // Print("Invalid trailing stop param, No stoploss detected");
+        return; 
+        }  
+        //Print(__FUNCTION__" Optype:"+OrderType());
+        //Return if Order is still in pending state
+      if ( !(OrderType()==OP_BUY || OrderType()==OP_SELL)){
+         
+        return; 
+      }
+   } 
+*/
+   if (!found){
+      //Print(__FUNCTION__+" ticketn not found");
       return;
    }
    
-   bool found = OrderSelect(ticket, SELECT_BY_TICKET);
-   if (found){
-     //Don't do trailing stop if no stoploss value is set
-      if (OrderStopLoss()==0){
-        Print("Invalid trailing stop param, No stoploss detected");
-        return; 
-        }  
+   if ( !(OrderType()==OP_BUY || OrderType()==OP_SELL)){
+      //Print(__FUNCTION__+" ticket not open yet");
+       
+        return;
    }
    
-   int longShortType= OrderType();
-   double currentSL = OrderStopLoss();
+   
+   //int longShortType= OrderType();
+   //double currentSL = OrderStopLoss();
+   
 
    //Check if new market rate is better then previous best market rate(last rate that caused stoploss to move via trailing update)
    double newMarketRate = OrderType()==OP_BUY ? Bid : Ask;
+   
+   //Initialize the dependent rate first time
+   if(trailStopDependentRate==0){
+      trailStopDependentRate=newMarketRate;
+      Print("Initialized primary trailStopDepRate: "+trailStopDependentRate);
+      return;
+   }
+   
    double diff = getDifference(trailStopDependentRate, newMarketRate, OrderType());
    
    if (diff <= 0 ){
@@ -423,8 +462,8 @@ void doTrailingStop(int ticket){
    }
    
    DPrint("TrailStop Prep");
-   DPrint("OldMktRate: "+trailStopDependentRate);
-   DPrint("NewMktRate: "+newMarketRate);
+   Print("OldMktRate: "+trailStopDependentRate);
+   Print("NewMktRate: "+newMarketRate);
    DPrint("DIff: " + diff);
    
    double newSL = OrderStopLoss();
@@ -435,15 +474,19 @@ void doTrailingStop(int ticket){
    } else{
       newSL-=diff;
    }
-   Print("newSL: "+newSL);
+
    
    bool res = OrderModify(ticket,OrderOpenPrice(),NormalizeDouble(newSL,Digits),OrderTakeProfit(),0,clrGreen);
-   if(!res)
+   if(!res){
+     Print("ModifyParams, OldSL:"+OrderStopLoss()+", NewSL:"+newSL);
      Print("Error in OrderModify (TrailStop). Error code=",GetLastError());
-   else
+     Print("Diff: "+diff);
+     }
+   else{
      Print("Order modified (TrailStop Updated) successfully.");
      trailStopDependentRate = newMarketRate;
-   
+     Print("Diff: "+diff);
+   }
 } 
 
 //get difference between 2 prices,  with correct sign depending on long/short/order type
@@ -459,7 +502,33 @@ double getDifference(double oldRate, double newRate, int orderType){
 }
 
 
-bool debug=true;
+void HandlePositionClosed(){
+
+   if (ticket!=0){
+      bool found = OrderSelect(ticket, SELECT_BY_TICKET);
+      if (!found || OrderCloseTime()!=0){
+         ticket=0;
+         entryOrdPlaced=false;
+         trailStopDependentRate=0;
+      }
+    }
+}
+
+bool MagicNumberValidator(){
+   int total = OrdersTotal();
+   for (int i=0; i< OrdersTotal(); i++){
+      OrderSelect(i,SELECT_BY_POS,MODE_TRADES);
+        if(MagicNumber== OrderMagicNumber()){
+         Print("EA already has ticket opened with specified Magic Number");
+         return false;
+        }
+   }
+   
+   return true;
+}
+
+
+bool debug=false;
 void DPrint(string str){
    if(debug)
     Print(str);
